@@ -2,13 +2,13 @@
   "name": "คลังรูปภาพกิจกรรม",
   "short_name": "Gallery",
   "description": "ระบบคลังรูปภาพกิจกรรมหน่วยงาน",
-  "start_url": "/index.html",
+  "start_url": "/App-picture/index.html",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#0f2044",
   "theme_color": "#0f2044",
   "lang": "th",
-  "scope": "/",
+  "scope": "/App-picture/",
   "icons": [
     { "src": "icons/icon-72x72.png",   "sizes": "72x72",   "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-96x96.png",   "sizes": "96x96",   "type": "image/png", "purpose": "any" },
@@ -26,7 +26,7 @@
       "name": "อัปโหลดรูปภาพ",
       "short_name": "อัปโหลด",
       "description": "เพิ่มรูปภาพกิจกรรมใหม่",
-      "url": "/index.html?action=upload",
+      "url": "/App-picture/index.html?action=upload",
       "icons": [{ "src": "icons/icon-96x96.png", "sizes": "96x96" }]
     }
   ],
