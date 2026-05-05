@@ -258,6 +258,16 @@
 <!-- ══ MAIN ══ -->
 <main class="max-w-7xl mx-auto px-4 md:px-6 pt-6 pb-8">
 
+  <!-- Search Bar -->
+  <div class="bg-white rounded-2xl shadow-md px-4 py-3 mb-3 flex items-center gap-3">
+    <span class="text-xl shrink-0">🔍</span>
+    <input id="search-input" type="search" placeholder="ค้นหากิจกรรม..."
+      class="flex-1 outline-none text-sm text-navy placeholder-blue-300 bg-transparent font-kanit"
+      oninput="handleSearch(this.value)" />
+    <button id="search-clear" onclick="clearSearch()"
+      class="hidden text-blue-300 hover:text-navy text-lg leading-none transition shrink-0">✕</button>
+  </div>
+
   <!-- Filter Bar -->
   <div class="bg-white rounded-2xl shadow-md px-4 py-3 mb-6 flex items-center gap-3 overflow-x-auto" style="scrollbar-width:none">
     <span class="text-navy text-sm font-semibold shrink-0">หมวดหมู่:</span>
@@ -334,10 +344,16 @@
       <div class="gold-line w-12"></div>
       <p id="lb-date" class="text-blue-400 text-xs flex items-center gap-1.5"><span>📅</span><span></span></p>
       <p id="lb-desc" class="text-gray-600 text-sm leading-relaxed flex-1"></p>
-      <a id="lb-drive-link" href="#" target="_blank"
-         class="inline-flex items-center gap-2 text-xs text-navy border border-navy rounded-full px-4 py-1.5 hover:bg-navy hover:text-yellow-300 transition-all self-start">
-        🔗 ดูรูปต้นฉบับใน Google Drive
-      </a>
+      <div class="flex flex-wrap gap-2">
+        <a id="lb-drive-link" href="#" target="_blank"
+           class="inline-flex items-center gap-2 text-xs text-navy border border-navy rounded-full px-4 py-1.5 hover:bg-navy hover:text-yellow-300 transition-all">
+          🔗 ดูรูปต้นฉบับ
+        </a>
+        <button id="lb-share-btn" onclick="shareCurrentItem()"
+           class="inline-flex items-center gap-2 text-xs bg-navy text-yellow-300 rounded-full px-4 py-1.5 hover:opacity-80 transition-all">
+          📤 แชร์รูปนี้
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -355,6 +371,7 @@
         <div>
           <p class="text-yellow-300 text-xs font-medium tracking-widest uppercase mb-1">เพิ่มรูปภาพใหม่</p>
           <h3 class="text-white text-lg font-bold">อัปโหลดรูปภาพกิจกรรม</h3>
+          <p class="text-blue-300 text-xs mt-1">💡 เคล็ดลับ: ข้อมูลจะค้างไว้ เพิ่มรูปต่อได้เลย</p>
         </div>
         <button onclick="closeUploadModal()" class="text-blue-300 hover:text-white text-2xl leading-none">✕</button>
       </div>
@@ -418,10 +435,10 @@
       </div>
 
       <!-- Buttons -->
-      <div class="flex gap-3 pt-1">
-        <button onclick="closeUploadModal()"
-          class="flex-1 border-2 border-gray-200 text-gray-500 font-semibold text-sm py-3 rounded-xl transition hover:border-gray-300">
-          ยกเลิก
+      <div class="flex gap-2 pt-1">
+        <button id="done-btn" onclick="finishUpload()"
+          class="flex-1 bg-gray-100 text-gray-600 font-semibold text-sm py-3 rounded-xl transition hover:bg-gray-200">
+          ✅ เสร็จสิ้น
         </button>
         <button id="submit-btn" onclick="submitUpload()"
           class="flex-[2] bg-navy text-yellow-300 font-semibold text-sm py-3 rounded-xl transition flex items-center justify-center gap-2 hover:opacity-90 active:scale-95">
@@ -528,6 +545,74 @@ function initOfflineDetection() {
 }
 
 // ──────────────────────────────────
+//  SEARCH
+// ──────────────────────────────────
+var searchKeyword = '';
+
+function handleSearch(val) {
+  searchKeyword = val.trim().toLowerCase();
+  document.getElementById('search-clear').classList.toggle('hidden', searchKeyword === '');
+  applyFilters();
+}
+
+function clearSearch() {
+  document.getElementById('search-input').value = '';
+  searchKeyword = '';
+  document.getElementById('search-clear').classList.add('hidden');
+  applyFilters();
+}
+
+function applyFilters() {
+  var filtered = allItems.filter(function(item) {
+    // กรองหมวดหมู่
+    var catMatch = activeCategory === 'ทั้งหมด' || item.category === activeCategory;
+    // กรองคำค้นหา
+    var keyword  = searchKeyword;
+    var searchMatch = keyword === '' || 
+      (item.title       && item.title.toLowerCase().includes(keyword)) ||
+      (item.description && item.description.toLowerCase().includes(keyword)) ||
+      (item.category    && item.category.toLowerCase().includes(keyword)) ||
+      (item.date        && item.date.includes(keyword));
+    return catMatch && searchMatch;
+  });
+  renderGallery(filtered);
+}
+
+// ──────────────────────────────────
+//  SHARE
+// ──────────────────────────────────
+var currentItem = null;
+
+function shareCurrentItem() {
+  if (!currentItem) return;
+  // สร้าง URL พร้อม query string id
+  var shareUrl = location.origin + location.pathname + '?id=' + currentItem.id;
+  
+  // ถ้ารองรับ Web Share API (มือถือ)
+  if (navigator.share) {
+    navigator.share({
+      title: currentItem.title,
+      text:  currentItem.description || currentItem.title,
+      url:   shareUrl,
+    }).catch(function() {});
+  } else {
+    // Desktop: คัดลอก URL ไปคลิปบอร์ด
+    navigator.clipboard.writeText(shareUrl).then(function() {
+      showToast('📋 คัดลอกลิงก์แล้ว! นำไปวางได้เลย', 'success');
+    }).catch(function() {
+      // fallback
+      var ta = document.createElement('textarea');
+      ta.value = shareUrl;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast('📋 คัดลอกลิงก์แล้ว!', 'success');
+    });
+  }
+}
+
+// ──────────────────────────────────
 //  FETCH GALLERY
 // ──────────────────────────────────
 async function fetchGallery() {
@@ -541,6 +626,12 @@ async function fetchGallery() {
     hideLoading();
     buildFilterButtons();
     renderGallery(allItems);
+    // ถ้ามี ?id= ใน URL → เปิด Lightbox รูปนั้นทันที
+    var urlId = new URLSearchParams(location.search).get('id');
+    if (urlId) {
+      var target = allItems.find(function(i){ return String(i.id) === String(urlId); });
+      if (target) setTimeout(function(){ openLightbox(target); }, 300);
+    }
   } catch(err) {
     hideLoading();
     showError(err.message);
@@ -605,10 +696,10 @@ function buildFilterButtons() {
 }
 
 function setFilter(cat, btn) {
+  activeCategory = cat;
   document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
   btn.classList.add('active');
-  var filtered = cat === 'ทั้งหมด' ? allItems : allItems.filter(function(i){ return i.category===cat; });
-  renderGallery(filtered);
+  applyFilters();
 }
 
 // ──────────────────────────────────
@@ -621,6 +712,7 @@ function initLightbox() {
 }
 
 function openLightbox(item) {
+  currentItem = item;
   document.getElementById('lb-img').src = item.imageUrl||'';
   document.getElementById('lb-title').textContent = item.title||'';
   document.getElementById('lb-badge').textContent = item.category||'';
@@ -629,12 +721,17 @@ function openLightbox(item) {
   document.getElementById('lb-drive-link').href = item.imageUrl||'#';
   document.getElementById('lightbox').classList.add('open');
   document.body.style.overflow = 'hidden';
+  // อัปเดต URL โดยไม่ reload
+  history.pushState({ id: item.id }, '', '?id=' + item.id);
 }
 
 function closeLightbox() {
+  currentItem = null;
   document.getElementById('lightbox').classList.remove('open');
   document.body.style.overflow = '';
   document.getElementById('lb-img').src = '';
+  // ล้าง URL
+  history.pushState({}, '', location.pathname);
 }
 
 // ──────────────────────────────────
@@ -714,15 +811,17 @@ async function submitUpload() {
 
     setTimeout(function(){
       setProgress(0,false); setSubmitLoading(false);
-      closeUploadModal(); resetForm();
-      showToast('✅ อัปโหลดสำเร็จ! กำลังโหลดแกลเลอรีใหม่...','success');
+      // ไม่ปิด Modal แต่ล้างเฉพาะรูป
+      resetFileOnly();
+      showToast('✅ อัปโหลดสำเร็จ! เพิ่มรูปต่อได้เลย', 'success');
+      // รีโหลดแกลเลอรีเบื้องหลัง (ไม่ปิด modal)
       setTimeout(function(){
         allItems=[]; categories=new Set();
         document.getElementById('filter-container').innerHTML='<button class="filter-btn active" data-cat="ทั้งหมด">ทั้งหมด</button>';
         renderSkeletons(8);
         document.getElementById('loading-state').style.display='flex';
         fetchGallery();
-      }, 1200);
+      }, 800);
     }, 500);
   } catch(err) {
     clearInterval(iv); setProgress(0,false); setSubmitLoading(false);
@@ -743,6 +842,12 @@ function setProgress(pct,show){
   document.getElementById('progress-fill').style.width=pct+'%';
   document.getElementById('progress-pct').textContent=pct+'%';
 }
+function finishUpload(){
+  closeUploadModal();
+  resetForm();
+  showToast('🎉 อัปโหลดเสร็จสิ้น!', 'success');
+}
+
 function setSubmitLoading(loading){
   var btn=document.getElementById('submit-btn');
   btn.disabled=loading; btn.style.opacity=loading?'0.7':'1';
@@ -757,6 +862,18 @@ function resetForm(){
   document.getElementById('drop-placeholder').classList.remove('hidden');
   document.getElementById('drop-preview').classList.add('hidden');
   document.getElementById('drop-zone').classList.remove('has-file');
+}
+
+// ล้างเฉพาะไฟล์รูป ข้อมูลอื่นยังค้างไว้
+function resetFileOnly(){
+  selectedFile=null;
+  document.getElementById('file-input').value='';
+  document.getElementById('preview-img').src='';
+  document.getElementById('drop-placeholder').classList.remove('hidden');
+  document.getElementById('drop-preview').classList.add('hidden');
+  document.getElementById('drop-zone').classList.remove('has-file');
+  // Focus กลับไปที่ช่องเลือกไฟล์
+  setTimeout(function(){ document.getElementById('drop-zone').scrollIntoView({behavior:'smooth',block:'center'}); }, 200);
 }
 
 // ──────────────────────────────────
