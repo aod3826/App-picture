@@ -52,7 +52,11 @@ self.addEventListener('fetch', function(e) {
       })
       .catch(function() {
         return caches.match(e.request)
-          .then(function(cached) { return cached || caches.match(BASE + '/index.html'); });
+          .then(function(cached) {
+            if (cached) return cached;
+            if (e.request.mode === 'navigate') return caches.match(BASE + '/index.html');
+            return Response.error();
+          });
       })
   );
 });

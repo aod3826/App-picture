@@ -416,6 +416,7 @@ async function fetchAlbums() {
     document.getElementById('loading-albums').classList.add('hidden');
     buildFilters();
     applyFilters();
+    handleDeepLink();
   } catch(err) {
     showToast('❌ เกิดข้อผิดพลาด: ' + err.message, 'error');
   }
@@ -729,7 +730,7 @@ function openLightbox(photo) {
   document.getElementById('lb-album').textContent = currentAlbum.title;
   document.getElementById('lb-caption').textContent = photo.caption || 'ไม่มีคำบรรยาย';
   document.getElementById('lb-date').textContent = '📅 ' + photo.uploadedAt;
-  document.getElementById('lb-drive').href = photo.imageUrl;
+  document.getElementById('lb-drive').href = photo.originalUrl || photo.imageUrl;
   document.getElementById('lightbox').classList.add('open');
 }
 
@@ -785,6 +786,27 @@ function showToast(msg, type) {
 function escHtml(s) {
   if (!s) return '';
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function handleDeepLink() {
+  const params = new URLSearchParams(location.search);
+  const albumId = params.get('album');
+  const photoId = params.get('photo');
+  if (!albumId) return;
+
+  await openAlbumFromLink(albumId, photoId);
+}
+
+async function openAlbumFromLink(albumId, photoId) {
+  await fetchAlbumDetail(albumId);
+  if (!currentAlbum) return;
+
+  document.getElementById('view-list').classList.add('hidden');
+  document.getElementById('view-detail').classList.remove('hidden');
+
+  if (!photoId) return;
+  const targetPhoto = currentPhotos.find(p => p.photoId === photoId);
+  if (targetPhoto) openLightbox(targetPhoto);
 }
 
 // ════════════════════════════════════════

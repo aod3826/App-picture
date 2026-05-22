@@ -261,10 +261,12 @@ function getPhotos(albumId) {
     const photos = data.slice(1)
       .filter(function(row) { return row[1] === albumId; })
       .map(function(row) {
+        const originalUrl = row[2] || '';
         return {
           photoId:   row[0],
           albumId:   row[1],
-          imageUrl:  convertDriveLink(row[2]),
+          imageUrl:  convertDriveLink(originalUrl),
+          originalUrl: originalUrl,
           caption:   row[3],
           uploadedAt: formatDate(row[4]),
         };
