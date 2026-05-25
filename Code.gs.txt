@@ -4,7 +4,7 @@
 // ============================================================
 
 const SHEET_NAME   = 'Gallery';
-const FOLDER_ID    = '1Uqy_rqyPrrONAq2-RdylbuCC1WBs8vKm'; // โฟลเดอร์ Google Drive
+const FOLDER_ID    = '1ytzj7Z5WhjIkekNw5RtyYTG9GDsjoBWt'; // โฟลเดอร์ Google Drive
 
 // ============================================================
 //  doGet — แสดงหน้าเว็บ HTML หรือส่ง JSON
