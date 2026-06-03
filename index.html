@@ -17,7 +17,7 @@
     // ═══════════════════════════════════════════════════
     //  ⚙️ CONFIG — แก้ไขค่านี้ก่อนใช้งาน
     // ═══════════════════════════════════════════════════
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwUUJq_MwfVE7Tb4fowyy3Nz0d2fo12wGXMLd1h_PcWIfqlMiHCIfp_Ln6atkBjPdMl/exec';
+    const GAS_URL = https://script.google.com/macros/s/AKfycbwUUJq_MwfVE7Tb4fowyy3Nz0d2fo12wGXMLd1h_PcWIfqlMiHCIfp_Ln6atkBjPdMl/exec';
     //  ตัวอย่าง: 'https://script.google.com/macros/s/AKfycb.../exec'
     // ═══════════════════════════════════════════════════
 
@@ -881,7 +881,7 @@
 
       setSubmitLoading(true);
 
-      // หาก GAS_URL ยังไม่ได้ตั้งค่า → แสดง Demo
+      // Demo mode
       if (!GAS_URL || GAS_URL.includes('YOUR_')) {
         await simulateDelay(1200);
         setSubmitLoading(false);
@@ -891,31 +891,116 @@
       }
 
       try {
-        const body = { action: 'addPhoto', title, category, description: desc, date };
         if (isUploadTab) {
-          body.imageBase64 = selectedBase64;
-          body.imageName   = selectedFile ? selectedFile.name : 'photo.jpg';
+          // ── อัปโหลดไฟล์: ส่ง Base64 ผ่าน GET query string (แบ่งส่งถ้าใหญ่) ──
+          await submitViaGet({
+            action      : 'addPhoto',
+            title, category,
+            description : desc,
+            date,
+            imageBase64 : selectedBase64,
+            imageName   : selectedFile ? selectedFile.name : 'photo.jpg',
+          });
         } else {
-          body.imageUrl = urlVal;
+          // ── URL: ส่งผ่าน GET query string ปกติ ──
+          await submitViaGet({
+            action      : 'addPhoto',
+            title, category,
+            description : desc,
+            date,
+            imageUrl    : urlVal,
+          });
         }
-
-        const res  = await fetch(GAS_URL, {
-          method  : 'POST',
-          headers : { 'Content-Type': 'application/json' },
-          body    : JSON.stringify(body),
-        });
-        const json = await res.json();
-        if (!json.success) throw new Error(json.message);
 
         setSubmitLoading(false);
         closeUploadModal();
-        showToast('✅ ' + json.message);
-        // รีโหลด gallery
+        showToast('✅ เพิ่มรูปภาพสำเร็จ!');
         await loadGallery();
       } catch (err) {
         setSubmitLoading(false);
         showUploadError(err.message || 'เกิดข้อผิดพลาด กรุณาลองอีกครั้ง');
       }
+    }
+
+    /**
+     * ส่งข้อมูลไปยัง GAS ผ่าน GET request (หลีกเลี่ยง CORS บน POST)
+     * Base64 อาจยาวเกิน URL limit → ใช้ multipart ส่งผ่าน hidden form แทน
+     */
+    async function submitViaGet(params) {
+      const base64 = params.imageBase64;
+
+      // ถ้าไม่มี Base64 → ส่งผ่าน fetch GET ปกติ (URL เท่านั้น)
+      if (!base64) {
+        const qs  = new URLSearchParams(params).toString();
+        const res = await fetch(`${GAS_URL}?${qs}`);
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message || 'บันทึกไม่สำเร็จ');
+        return json;
+      }
+
+      // มี Base64 → ส่งผ่าน hidden iframe form (bypass CORS สำหรับ POST)
+      return await submitViaIframe(params);
+    }
+
+    /**
+     * Iframe trick: สร้าง hidden form → POST → GAS รับผ่าน doPost
+     * แล้ว poll GET เพื่อตรวจสอบว่าแถวใหม่เข้า Sheet แล้ว
+     */
+    function submitViaIframe(params) {
+      return new Promise((resolve, reject) => {
+        const iframeName = 'gas_upload_' + Date.now();
+        const iframe = document.createElement('iframe');
+        iframe.name  = iframeName;
+        iframe.style.cssText = 'display:none;position:absolute;top:-9999px';
+        document.body.appendChild(iframe);
+
+        const form = document.createElement('form');
+        form.method  = 'POST';
+        form.action  = GAS_URL;
+        form.target  = iframeName;
+        form.enctype = 'application/x-www-form-urlencoded';
+
+        // ส่ง JSON ทั้งก้อนผ่าน field เดียว
+        const hidden = document.createElement('input');
+        hidden.type  = 'hidden';
+        hidden.name  = 'payload';
+        hidden.value = JSON.stringify(params);
+        form.appendChild(hidden);
+        document.body.appendChild(form);
+
+        // รับผลผ่าน postMessage จาก GAS (ถ้า output HTML)
+        // หรือ poll Sheet count แทน
+        const prevTotal = allItems.length;
+        let pollCount   = 0;
+        const maxPoll   = 24; // รอสูงสุด 24 × 2.5s = 60s
+
+        form.submit();
+
+        const poll = setInterval(async () => {
+          pollCount++;
+          try {
+            const res  = await fetch(`${GAS_URL}?action=getGallery&_t=${Date.now()}`);
+            const json = await res.json();
+            if (json.success && json.total > prevTotal) {
+              clearInterval(poll);
+              cleanup();
+              resolve({ success: true });
+              return;
+            }
+          } catch (_) {}
+
+          if (pollCount >= maxPoll) {
+            clearInterval(poll);
+            cleanup();
+            reject(new Error('หมดเวลารอ กรุณาตรวจสอบใน Google Sheet โดยตรง'));
+          }
+        }, 2500);
+
+        function cleanup() {
+          try { document.body.removeChild(iframe); } catch(_) {}
+          try { document.body.removeChild(form);   } catch(_) {}
+        }
+      });
     }
 
     function setSubmitLoading(on) {
